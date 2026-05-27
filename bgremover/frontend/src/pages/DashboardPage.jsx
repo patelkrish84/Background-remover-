@@ -11,6 +11,52 @@ import {
 } from 'lucide-react';
 
 const COIN_ICONS = ['🪙', '🥈', '🥇', '💎', '👑', '⚡', '🔥'];
+const MAX_UPLOAD_EDGE = 1024;
+const UPLOAD_QUALITY = 0.86;
+
+const loadImage = (file) => new Promise((resolve, reject) => {
+  const url = URL.createObjectURL(file);
+  const img = new Image();
+
+  img.onload = () => {
+    URL.revokeObjectURL(url);
+    resolve(img);
+  };
+
+  img.onerror = () => {
+    URL.revokeObjectURL(url);
+    reject(new Error('Unable to read this image.'));
+  };
+
+  img.src = url;
+});
+
+const resizeImageForUpload = async (file) => {
+  if (file.type === 'image/gif') return file;
+
+  const image = await loadImage(file);
+  const largestEdge = Math.max(image.width, image.height);
+  if (largestEdge <= MAX_UPLOAD_EDGE && file.size <= 2.5 * 1024 * 1024) {
+    return file;
+  }
+
+  const scale = Math.min(1, MAX_UPLOAD_EDGE / largestEdge);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(image.width * scale);
+  canvas.height = Math.round(image.height * scale);
+
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+  const blob = await new Promise((resolve) => {
+    canvas.toBlob(resolve, 'image/jpeg', UPLOAD_QUALITY);
+  });
+
+  if (!blob) return file;
+
+  const baseName = file.name.replace(/\.[^.]+$/, '');
+  return new File([blob], `${baseName}.jpg`, { type: 'image/jpeg' });
+};
 
 export default function DashboardPage() {
   const { user, logout, updateUser, pendingImage, setPendingImage } = useAuth();
@@ -72,14 +118,18 @@ export default function DashboardPage() {
     }
 
     setProcessing(true);
-    const toastId = toast.loading('AI is removing the background locally...');
+    const toastId = toast.loading('Preparing image...');
 
     try {
+      const uploadFile = await resizeImageForUpload(originalImage.file);
       const formData = new FormData();
-      formData.append('image', originalImage.file);
+      formData.append('image', uploadFile);
+
+      toast.loading('AI is removing the background...', { id: toastId });
 
       const res = await axios.post('/api/images/remove-bg', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 240000,
       });
 
       setProcessedImage(res.data.image);
@@ -92,7 +142,7 @@ export default function DashboardPage() {
         toast.error('🪙 Coin limit reached! Upgrade your plan.', { id: toastId, duration: 5000 });
         setTimeout(() => navigate('/pricing'), 2000);
       } else {
-        toast.error(msg || 'Processing failed. Try again.', { id: toastId });
+        toast.error(msg || 'Processing failed. The server may be busy; try a smaller image.', { id: toastId });
       }
     } finally {
       setProcessing(false);

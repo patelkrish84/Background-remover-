@@ -18,6 +18,9 @@ services:
       PORT: 5000
       FIREBASE_SERVICE_ACCOUNT_PATH: /run/secrets/firebase-adminsdk.json
       REMBG_PYTHON: python
+      REMBG_MODEL: u2netp
+      REMBG_MAX_EDGE: 1024
+      BACKGROUND_REMOVAL_PROVIDER: auto
       U2NET_HOME: /app/.u2net
     ports:
       - "5000:5000"
