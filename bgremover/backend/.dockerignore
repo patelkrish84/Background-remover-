@@ -1,5 +1,8 @@
 node_modules
 npm-debug.log
 .env
+*.env.local
+*.env.*.local
 rembg_test.png
 rembg_test.err
+.u2net

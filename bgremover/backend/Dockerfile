@@ -19,7 +19,7 @@ COPY middleware ./middleware
 COPY models ./models
 COPY routes ./routes
 COPY scripts ./scripts
-COPY firebase.js server.js ./
+COPY downloadModel.js firebase.js server.js ./
 
 RUN mkdir -p /app/.u2net
 

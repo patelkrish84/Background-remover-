@@ -4,6 +4,7 @@ require('./firebase');
 const express = require('express');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
+const downloadModel = require('./downloadModel');
 
 const app = express();
 
@@ -30,6 +31,13 @@ app.get('/api/health', (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`Firebase backend running on http://localhost:${PORT}`);
-});
+downloadModel()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Firebase backend running on http://localhost:${PORT}`);
+    });
+  })
+  .catch((error) => {
+    console.error('Failed to prepare U-2-Net model:', error.message);
+    process.exit(1);
+  });
