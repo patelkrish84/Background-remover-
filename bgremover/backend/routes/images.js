@@ -27,6 +27,40 @@ const PLAN_COINS = {
 const REMBG_PYTHON = process.env.REMBG_PYTHON || 'python';
 const REMBG_SCRIPT = path.join(__dirname, '..', 'scripts', 'remove_bg.py');
 const REMBG_TIMEOUT_MS = Number(process.env.REMBG_TIMEOUT_MS || 180000);
+const BACKGROUND_REMOVAL_PROVIDER = process.env.BACKGROUND_REMOVAL_PROVIDER || 'auto';
+const REMOVAL_BG_API_KEY = process.env.REMOVAL_BG_API_KEY;
+
+const toDataUrl = (buffer) => `data:image/png;base64,${buffer.toString('base64')}`;
+
+const removeBackgroundWithRemoveBg = async (file) => {
+  if (!REMOVAL_BG_API_KEY) {
+    throw new Error('REMOVAL_BG_API_KEY is not configured.');
+  }
+
+  const formData = new FormData();
+  const blob = new Blob([file.buffer], { type: file.mimetype });
+  formData.append('image_file', blob, file.originalname || 'upload.png');
+  formData.append('size', 'auto');
+
+  const response = await fetch('https://api.remove.bg/v1.0/removebg', {
+    method: 'POST',
+    headers: {
+      'X-Api-Key': REMOVAL_BG_API_KEY,
+    },
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`remove.bg failed with status ${response.status}: ${detail}`);
+  }
+
+  return {
+    image: toDataUrl(Buffer.from(await response.arrayBuffer())),
+    provider: 'remove.bg',
+    model: 'remove.bg',
+  };
+};
 
 const removeBackgroundWithRembg = (file) => {
   return new Promise((resolve, reject) => {
@@ -68,11 +102,31 @@ const removeBackgroundWithRembg = (file) => {
         return;
       }
 
-      resolve(`data:image/png;base64,${Buffer.concat(output).toString('base64')}`);
+      resolve({
+        image: toDataUrl(Buffer.concat(output)),
+        provider: 'local',
+        model: `rembg/${process.env.REMBG_MODEL || 'u2netp'}`,
+      });
     });
 
     child.stdin.end(file.buffer);
   });
+};
+
+const removeBackground = async (file) => {
+  if (BACKGROUND_REMOVAL_PROVIDER === 'removebg') {
+    return removeBackgroundWithRemoveBg(file);
+  }
+
+  if (BACKGROUND_REMOVAL_PROVIDER === 'local') {
+    return removeBackgroundWithRembg(file);
+  }
+
+  if (REMOVAL_BG_API_KEY) {
+    return removeBackgroundWithRemoveBg(file);
+  }
+
+  return removeBackgroundWithRembg(file);
 };
 
 router.post('/remove-bg', auth, upload.single('image'), async (req, res) => {
@@ -97,7 +151,7 @@ router.post('/remove-bg', auth, upload.single('image'), async (req, res) => {
       });
     }
 
-    const processedImage = await removeBackgroundWithRembg(req.file);
+    const result = await removeBackground(req.file);
 
     user.coins -= 1;
     user.totalImagesProcessed += 1;
@@ -106,17 +160,19 @@ router.post('/remove-bg', auth, upload.single('image'), async (req, res) => {
 
     res.json({
       success: true,
-      image: processedImage,
+      image: result.image,
       coinsLeft: user.coins,
       totalProcessed: user.totalImagesProcessed,
+      model: result.model,
+      provider: result.provider,
       message: `Background removed! ${user.coins} coins remaining.`,
     });
   } catch (error) {
     console.error('Remove BG error:', error.message);
     res.status(500).json({
       message: error.message || 'Failed to process image. Please try again.',
-      model: 'rembg/u2net',
-      provider: 'local',
+      model: process.env.REMBG_MODEL ? `rembg/${process.env.REMBG_MODEL}` : 'rembg/u2netp',
+      provider: REMOVAL_BG_API_KEY ? 'remove.bg' : 'local',
     });
   }
 });

@@ -70,8 +70,12 @@ app.get('/api/health', (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
+const provider = process.env.BACKGROUND_REMOVAL_PROVIDER || 'auto';
+const shouldPrepareLocalModel = provider === 'local' || (provider === 'auto' && !process.env.REMOVAL_BG_API_KEY);
 
-downloadModel()
+const prepareBackgroundRemoval = shouldPrepareLocalModel ? downloadModel() : Promise.resolve();
+
+prepareBackgroundRemoval
   .then(() => {
     app.listen(PORT, () => {
       console.log(`Firebase backend running on http://localhost:${PORT}`);
