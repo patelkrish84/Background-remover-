@@ -13,8 +13,13 @@ const limiter = rateLimit({
   max: 100,
 });
 
+const allowedOrigins = (process.env.CORS_ORIGINS || '')
+  .split(',')
+  .map(origin => origin.trim())
+  .filter(Boolean);
+
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:5173'],
+  origin: allowedOrigins.length ? allowedOrigins : true,
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
