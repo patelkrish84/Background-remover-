@@ -7,7 +7,7 @@ from rembg import new_session, remove
 
 
 def prepare_image(image_bytes):
-    max_edge = int(os.getenv("REMBG_MAX_EDGE", "1600"))
+    max_edge = int(os.getenv("REMBG_MAX_EDGE", "1024"))
     image = Image.open(BytesIO(image_bytes))
     image = ImageOps.exif_transpose(image).convert("RGBA")
 

@@ -74,6 +74,7 @@ const removeBackgroundWithRembg = (file) => {
 
     const output = [];
     const errors = [];
+    let stdinError = null;
     let settled = false;
 
     const timer = setTimeout(() => {
@@ -85,10 +86,7 @@ const removeBackgroundWithRembg = (file) => {
     child.stdout.on('data', chunk => output.push(chunk));
     child.stderr.on('data', chunk => errors.push(chunk));
     child.stdin.on('error', error => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      reject(new Error(`Unable to send image to rembg Python process: ${error.message}`));
+      stdinError = error;
     });
     child.on('error', error => {
       if (settled) return;
@@ -104,7 +102,13 @@ const removeBackgroundWithRembg = (file) => {
 
       if (code !== 0) {
         const detail = Buffer.concat(errors).toString('utf8').trim();
-        reject(new Error(detail || `rembg exited with code ${code}`));
+        const pipeDetail = stdinError ? ` Image pipe error: ${stdinError.message}` : '';
+        reject(new Error(detail || `rembg exited with code ${code}.${pipeDetail}`));
+        return;
+      }
+
+      if (stdinError) {
+        reject(new Error(`Unable to send image to rembg Python process: ${stdinError.message}`));
         return;
       }
 
@@ -115,7 +119,11 @@ const removeBackgroundWithRembg = (file) => {
       });
     });
 
-    child.stdin.end(file.buffer);
+    try {
+      child.stdin.end(file.buffer);
+    } catch (error) {
+      stdinError = error;
+    }
   });
 };
 
