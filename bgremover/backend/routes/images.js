@@ -84,6 +84,12 @@ const removeBackgroundWithRembg = (file) => {
 
     child.stdout.on('data', chunk => output.push(chunk));
     child.stderr.on('data', chunk => errors.push(chunk));
+    child.stdin.on('error', error => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      reject(new Error(`Unable to send image to rembg Python process: ${error.message}`));
+    });
     child.on('error', error => {
       if (settled) return;
       settled = true;
