@@ -13,15 +13,37 @@ const limiter = rateLimit({
   max: 100,
 });
 
-const allowedOrigins = (process.env.CORS_ORIGINS || '')
-  .split(',')
+const defaultOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'https://background-remover-silk-three.vercel.app',
+  'https://background-remover-m2tq.onrender.com',
+];
+
+const allowedOrigins = [
+  ...defaultOrigins,
+  ...(process.env.CORS_ORIGINS || '').split(','),
+  process.env.FRONTEND_URL,
+]
+  .filter(Boolean)
   .map(origin => origin.trim())
   .filter(Boolean);
 
-app.use(cors({
-  origin: allowedOrigins.length ? allowedOrigins : true,
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes('*') || allowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error(`CORS blocked for origin: ${origin}`));
+  },
   credentials: true,
-}));
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use('/api/', limiter);

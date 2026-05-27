@@ -2,14 +2,21 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 
+const REMBG_MODEL = process.env.REMBG_MODEL || 'u2netp';
+const DEFAULT_MODEL_URLS = {
+  u2net: 'https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx',
+  u2netp: 'https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx',
+};
+
 const MODEL_URL = process.env.U2NET_MODEL_URL
-  || 'https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net.onnx';
+  || DEFAULT_MODEL_URLS[REMBG_MODEL]
+  || DEFAULT_MODEL_URLS.u2netp;
 
 const modelDir = process.env.U2NET_HOME
   ? path.resolve(process.env.U2NET_HOME)
   : path.join(__dirname, '.u2net');
 
-const modelPath = path.join(modelDir, 'u2net.onnx');
+const modelPath = path.join(modelDir, `${REMBG_MODEL}.onnx`);
 const tempPath = `${modelPath}.download`;
 
 const downloadFile = (url, redirectCount = 0) => new Promise((resolve, reject) => {
