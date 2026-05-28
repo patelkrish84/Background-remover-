@@ -11,8 +11,8 @@ import {
 } from 'lucide-react';
 
 const COIN_ICONS = ['🪙', '🥈', '🥇', '💎', '👑', '⚡', '🔥'];
-const MAX_UPLOAD_EDGE = 1024;
-const UPLOAD_QUALITY = 0.86;
+const MAX_UPLOAD_EDGE = 512;
+const UPLOAD_QUALITY = 0.7;
 
 const loadImage = (file) => new Promise((resolve, reject) => {
   const url = URL.createObjectURL(file);
