@@ -4,7 +4,6 @@ require('./firebase');
 const express = require('express');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
-const downloadModel = require('./downloadModel');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -71,18 +70,19 @@ app.get('/api/health', (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-const provider = process.env.BACKGROUND_REMOVAL_PROVIDER || 'auto';
-const shouldPrepareLocalModel = provider === 'local' || (provider === 'auto' && !process.env.REMOVAL_BG_API_KEY);
+const REMOVAL_BG_API_KEY = process.env.REMOVAL_BG_API_KEY;
 
-const prepareBackgroundRemoval = shouldPrepareLocalModel ? downloadModel() : Promise.resolve();
+if (!REMOVAL_BG_API_KEY) {
+  console.warn('WARNING: REMOVAL_BG_API_KEY is not set. remove.bg background removal will fail.');
+}
 
-prepareBackgroundRemoval
+Promise.resolve()
   .then(() => {
     app.listen(PORT, () => {
       console.log(`Firebase backend running on http://localhost:${PORT}`);
     });
   })
   .catch((error) => {
-    console.error('Failed to prepare U-2-Net model:', error.message);
+    console.error('Failed to start server:', error.message);
     process.exit(1);
   });

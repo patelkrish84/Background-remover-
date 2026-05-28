@@ -1,8 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const multer = require('multer');
-const path = require('path');
-const { spawn } = require('child_process');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
 
@@ -24,10 +22,6 @@ const PLAN_COINS = {
   elite: { coins: 999, label: 'Elite', price: 6499 },
 };
 
-const REMBG_PYTHON = process.env.REMBG_PYTHON || 'python';
-const REMBG_SCRIPT = path.join(__dirname, '..', 'scripts', 'remove_bg.py');
-const REMBG_TIMEOUT_MS = Number(process.env.REMBG_TIMEOUT_MS || 180000);
-const BACKGROUND_REMOVAL_PROVIDER = process.env.BACKGROUND_REMOVAL_PROVIDER || 'auto';
 const REMOVAL_BG_API_KEY = process.env.REMOVAL_BG_API_KEY;
 
 const toDataUrl = (buffer) => `data:image/png;base64,${buffer.toString('base64')}`;
@@ -62,91 +56,8 @@ const removeBackgroundWithRemoveBg = async (file) => {
   };
 };
 
-const removeBackgroundWithRembg = (file) => {
-  return new Promise((resolve, reject) => {
-    const child = spawn(REMBG_PYTHON, [REMBG_SCRIPT], {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: {
-        ...process.env,
-        U2NET_HOME: process.env.U2NET_HOME || path.join(__dirname, '..', '.u2net'),
-      },
-    });
-
-    const output = [];
-    const errors = [];
-    let stdinError = null;
-    let settled = false;
-
-    const timer = setTimeout(() => {
-      settled = true;
-      child.kill('SIGKILL');
-      reject(new Error('Local U-2-Net processing timed out. Try a smaller image.'));
-    }, REMBG_TIMEOUT_MS);
-
-    child.stdout.on('data', chunk => output.push(chunk));
-    child.stderr.on('data', chunk => {
-      const errorData = chunk.toString();
-      console.log('🔴 PYTHON STDERR:', errorData);
-      errors.push(chunk);
-    });
-    child.stdin.on('error', error => {
-      console.log('🔴 STDIN ERROR:', error.message);
-      stdinError = error;
-    });
-    child.on('error', error => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      console.log('🔴 CHILD PROCESS ERROR:', error.message);
-      reject(new Error(`Unable to start rembg Python process: ${error.message}`));
-    });
-
-    child.on('close', code => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-
-      if (code !== 0) {
-        const detail = Buffer.concat(errors).toString('utf8').trim();
-        const pipeDetail = stdinError ? ` Image pipe error: ${stdinError.message}` : '';
-        reject(new Error(detail || `rembg exited with code ${code}.${pipeDetail}`));
-        return;
-      }
-
-      if (stdinError) {
-        reject(new Error(`Unable to send image to rembg Python process: ${stdinError.message}`));
-        return;
-      }
-
-      resolve({
-        image: toDataUrl(Buffer.concat(output)),
-        provider: 'local',
-        model: `rembg/${process.env.REMBG_MODEL || 'u2netp'}`,
-      });
-    });
-
-    try {
-      child.stdin.end(file.buffer);
-    } catch (error) {
-      stdinError = error;
-    }
-  });
-};
-
 const removeBackground = async (file) => {
-  if (BACKGROUND_REMOVAL_PROVIDER === 'removebg') {
-    return removeBackgroundWithRemoveBg(file);
-  }
-
-  if (BACKGROUND_REMOVAL_PROVIDER === 'local') {
-    return removeBackgroundWithRembg(file);
-  }
-
-  if (REMOVAL_BG_API_KEY) {
-    return removeBackgroundWithRemoveBg(file);
-  }
-
-  return removeBackgroundWithRembg(file);
+  return removeBackgroundWithRemoveBg(file);
 };
 
 router.post('/remove-bg', auth, upload.single('image'), async (req, res) => {
@@ -193,8 +104,8 @@ router.post('/remove-bg', auth, upload.single('image'), async (req, res) => {
     console.error('🔥 ERROR STACK:', error.stack);
     res.status(500).json({
       message: error.message || 'Failed to process image. Please try again.',
-      model: process.env.REMBG_MODEL ? `rembg/${process.env.REMBG_MODEL}` : 'rembg/u2netp',
-      provider: REMOVAL_BG_API_KEY ? 'remove.bg' : 'local',
+      model: 'remove.bg',
+      provider: 'remove.bg',
     });
   }
 });
