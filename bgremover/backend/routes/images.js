@@ -84,14 +84,20 @@ const removeBackgroundWithRembg = (file) => {
     }, REMBG_TIMEOUT_MS);
 
     child.stdout.on('data', chunk => output.push(chunk));
-    child.stderr.on('data', chunk => errors.push(chunk));
+    child.stderr.on('data', chunk => {
+      const errorData = chunk.toString();
+      console.log('🔴 PYTHON STDERR:', errorData);
+      errors.push(chunk);
+    });
     child.stdin.on('error', error => {
+      console.log('🔴 STDIN ERROR:', error.message);
       stdinError = error;
     });
     child.on('error', error => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      console.log('🔴 CHILD PROCESS ERROR:', error.message);
       reject(new Error(`Unable to start rembg Python process: ${error.message}`));
     });
 
@@ -182,7 +188,9 @@ router.post('/remove-bg', auth, upload.single('image'), async (req, res) => {
       message: `Background removed! ${user.coins} coins remaining.`,
     });
   } catch (error) {
-    console.error('Remove BG error:', error.message);
+    console.error('🔥 REAL ERROR:', error);
+    console.error('🔥 ERROR MESSAGE:', error.message);
+    console.error('🔥 ERROR STACK:', error.stack);
     res.status(500).json({
       message: error.message || 'Failed to process image. Please try again.',
       model: process.env.REMBG_MODEL ? `rembg/${process.env.REMBG_MODEL}` : 'rembg/u2netp',
