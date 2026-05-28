@@ -3,7 +3,7 @@ import os
 from io import BytesIO
 
 from PIL import Image, ImageOps
-from rembg import new_session, remove
+from rembg import remove
 
 
 def prepare_image(image_bytes):
@@ -30,9 +30,9 @@ def main():
     if not image_bytes:
         raise ValueError("No image bytes received")
 
-    model = os.getenv("REMBG_MODEL", "u2netp")
-    session = new_session(model)
-    output = remove(prepare_image(image_bytes), session=session)
+    # TEMPORARY TEST: Direct rembg remove without custom session
+    input_data = prepare_image(image_bytes)
+    output = remove(input_data)
     sys.stdout.buffer.write(output)
 
 
